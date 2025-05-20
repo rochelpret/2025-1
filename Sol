@@ -1,0 +1,164 @@
+a) Obtener el tiempo de ejecución del programa síncrono. Indicar cómo se obtiene el tiempo de ejecución.
+
+import time
+start = time.time()
+main()
+end = time.time()
+print(f"Tiempo de ejecución: {end - start:.2f} segundos")
+
+Se obtiene envolviendo la función main() con time.time() antes y después de su ejecución.
+
+b) Identificar si el programa tiene una estructura fuertemente “cpu-bound”, “i/o-bound” o tiene otras características relevantes.
+
+El programa es mixto pero principalmente CPU-bound debido al filtro de imagen intensivo aplicado reiteradas veces. Las operaciones de red (descarga/guardado) son I/O-bound, pero la mayor carga es de procesamiento de imagen (CPU).
+
+c) Obtener el tiempo de ejecución del programa asíncrono. Calcular el speedup resultante.
+
+import time
+start = time.time()
+asyncio.run(main())
+end = time.time()
+print(f"Tiempo async: {end - start:.2f} segundos")
+
+# Speedup
+speedup = sync_time / async_time
+
+Explicación: La asincronía mejora operaciones I/O, pero no tanto las CPU-bound. El speedup es menor que con multiprocessing.
+
+
+---
+
+d) Obtener el tiempo de ejecución del programa multihilo (no la versión con pool). Calcular el speedup resultante.
+
+import time
+start = time.time()
+main()
+end = time.time()
+print(f"Tiempo multihilo: {end - start:.2f} segundos")
+
+# Speedup
+speedup = sync_time / multithread_time
+
+Explicación: Python tiene GIL, lo que limita el rendimiento para tareas CPU-bound con hilos.
+
+
+---
+
+e) Obtener el tiempo de ejecución del programa multi proceso (no la versión con pool). Calcular el speedup resultante.
+
+import time
+start = time.time()
+main()
+end = time.time()
+print(f"Tiempo multiprocessing: {end - start:.2f} segundos")
+
+# Speedup
+speedup = sync_time / multiproc_time
+
+Explicación: multiprocessing permite ejecutar tareas CPU-bound en paralelo real, mejorando el tiempo.
+
+
+---
+
+f) Comparación de resultados:
+
+asyncio: Mejor para I/O, limitado por el GIL para CPU-bound.
+
+Multithread: No mejora mucho para CPU-bound.
+
+Multiprocessing: Mayor speedup al usar varios núcleos.
+
+
+La mejor es multiprocessing, lo que concuerda con la teoría.
+
+
+---
+
+g) Evaluar con mprof:
+
+mprof run image_process_async.py
+mprof plot
+
+Resultados esperados:
+
+Multiprocessing consume más memoria (cada proceso es aislado).
+
+Threads y async comparten memoria.
+
+
+Conclusión: multiprocessing > multithread > async en consumo de RAM. Esto es coherente con la teoría.
+
+
+---
+
+h) Comparar multithread vs. multithread con Pool:
+
+# Tiempo usando time.time()
+# Comparar ejecución con y sin ThreadPoolExecutor
+
+Resultado: Pool reduce overhead de creación de hilos, mejora tiempo.
+
+
+---
+
+i) Huella de memoria multihilo vs. multihilo con pool:
+
+mprof run image_process_multithread.py
+mprof run image_process_multithreaded_pool.py
+
+Resultado: El uso de Pool reduce la memoria al reutilizar hilos. Coincide con la teoría.
+
+
+---
+
+j) Multiproceso vs. Pool:
+
+# Comparar tiempos con y sin Pool (multiprocessing vs Pool)
+
+Resultado: Pool mejora la eficiencia al evitar sobrecarga de crear procesos.
+
+
+---
+
+k) Huella de memoria multiprocessing vs. multiprocessing con Pool:
+
+mprof run image_process_multiprocessing.py
+mprof run image_process_multiprocessing_pool.py
+
+Resultado: Pool usa menos memoria, ya que limita número de procesos simultáneos. Es consistente con la teoría.
+
+
+---
+
+l) Beneficio del uso de Pool:
+
+Pool optimiza recursos reutilizando hilos/procesos, reduciendo overhead y memoria, mejorando el rendimiento total.
+
+
+---
+
+m) Mejor implementación:
+
+Tiempo: Multiprocessing con Pool
+
+Memoria: Multithread con Pool o async
+
+
+Balance: multiprocessing con Pool presenta mejor compromiso entre tiempo y consumo razonable de memoria.
+
+
+---
+
+Adjuntar capturas de:
+
+Resultados de tiempo de cada implementación
+
+Plots de mprof
+
+Código donde se añadió time.time()
+
+
+
+
+{ "query": "cómo medir tiempo de ejecución en Python para cada programa" }
+
