@@ -1,0 +1,456 @@
+Resuelve lo siguiente y dame sólo código y las que pide explicar explica:
+Se desea evaluar las diferentes formas de ejecutar código, específicamente utilizando diferentes técnicas de concurrencia. Para esto se analizará un programa reimplementado en varias formas. Todos los programas están disponibles en la misma carpeta que este documento.
+
+Adicionalmente, se encuentran dos archivos de texto, antes de empezar las preguntas es necesario instalar todas las dependencias, para lo cual puede ejecutar el siguiente comando ‘pip install -r requirements.txt’, si está ejecutando la pregunta en Linux puede intentar con pip3 en vez de pip. Asegúrese de tener pip instalado.
+
+Crear un documento editable y copiar las preguntas requeridas en orden. En cada pregunta debe sustentar su resultado con la información del resultado del programa, así como la teoría que permita complementar sus resultados. No se aceptarán respuestas que no estén propiamente justificadas, aún si el enunciado de la pregunta no lo especifica. Las capturas de pantalla que adjunte deben ser lo suficientemente claras para considerarse válidas.
+
+Debe subir a PAIDEIA, únicamente, un archivo con el nombre E2_CODIGOPUCP.PDF donde CODIGOPUCP es su código PUCP.
+
+Solo se aceptan entregas por este medio. Los alumnos que no suban a tiempo su archivo y persistan en enviar su solución por otros medios como correo electrónico, recibirán de nota 0 en esta parte y se le realizará una penalización de -1 en la primera parte.
+
+Las indicaciones para realizar esta sección estarán descritas en la pizarra del examen.
+
+Con el entorno ya configurado correctamente, se le pide lo siguiente:
+
+a)        Obtener el tiempo de ejecución del programa síncrono. Indicar cómo se obtiene el tiempo de ejecución. (1 punto)
+
+b)       Identificar si el programa tiene una estructura fuertemente “cpu-bound”, “i/o-bound” o tiene otras características relevantes.  (1 punto)
+
+c)        Obtener el tiempo de ejecución del programa asíncrono. Calcular el speedup resultante. (1 punto)
+
+d)       Obtener el tiempo de ejecución del programa multihilo (no la versión con pool). Calcular el speedup resultante. (1 punto)
+
+e)        Obtener el tiempo de ejecución del programa multi proceso (no la versión con pool). Calcular el speedup resultante. (1 punto)
+
+f)          Explique y compare los resultados de las tres implementaciones de concurrencia ejecutadas hasta el momento. ¿Qué implementación exhibe el mejor resultado? ¿Estos resultados coinciden con la teoría estudiada? (1 punto)
+
+g)        Utilice el programa de perfilamiento de memoria, memory_profiler (mprof), para analizar la huella de memoria de los tres programas concurrentes ejecutados hasta el momento. ¿Qué programa tiene el mayor consumo de memoria? ¿Estos resultados coinciden con la teoría estudiada? Justifique su respuesta. (1 punto)
+
+h)        Realice una evaluación de tiempo de ejecución de la implementación multihilo sin Pool, con respecto a la implementación multihilo con Pool. Indique qué implementación presenta un mejor speedup. Justifique sus resultados. (1 punto)
+
+i)          Evalúe la huella de memoria de la implementación multihilo sin Pool, con respecto a la implementación multihilo con Pool. Indique qué implementación presenta una menor huella de memoria. ¿Este resultado coincide con la teoría estudiada? (1 punto)
+
+j)          Realice una evaluación de tiempo de ejecución de la implementación multi proceso sin Pool, con respecto a la implementación multi proceso con Pool. Indique qué implementación presenta un mejor speedup. Justifique sus resultados. (1 punto)
+
+k)        Evalúe la huella de memoria de la implementación multi proceso sin Pool, con respecto a la implementación multi proceso con Pool. Indique qué implementación presenta una menor huella de memoria. ¿Este resultado coincide con la teoría estudiada? (1 punto)
+
+l)          Utilizando la teoría estudiada y los resultados obtenidos hasta el momento, ¿Cuál es el beneficio de utilizar Pool de recursos para acelerar la ejecución a través de concurrencia? (1 punto)
+
+m)       Indique cuál es la implementación que presenta mejores resultados, para su respuesta considere tanto el tiempo de ejecución como la huella de memoria de cada pregunta. (2 puntos)
+
+Con los códigos en python:
+image_process_async.py:
+import asyncio
+import os
+import aiohttp
+import aiofiles
+from PIL import Image, ImageFilter
+import io
+
+def read_image_urls(file_path):
+with open(file_path, 'r') as f:
+image_urls = [line.strip() for line in f if line.strip()]
+
+image_urls = image_urls * 4  
+return image_urls
+
+async def download_image(session, url):
+headers = {
+'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'
+}
+async with session.get(url, headers=headers) as response:
+response.raise_for_status()
+content = await response.read()
+return content  # Devuelve los datos de la imagen en bytes
+
+def process_image(image_data):
+# Convert bytes data to PIL Image
+image = Image.open(io.BytesIO(image_data))
+
+# Apply a computationally intensive sharpening filter  
+for _ in range(10):  
+    image = image.filter(ImageFilter.UnsharpMask(radius=2, percent=150, threshold=3))  
+
+# Save processed image to bytes  
+output = io.BytesIO()  
+image.save(output, format='JPEG')  
+return output.getvalue()  # Return processed image data as bytes
+
+async def save_image(image_data, filename):
+async with aiofiles.open(filename, 'wb') as f:
+await f.write(image_data)
+
+async def process_single_image(idx, url, session):
+print(f"Processing image {idx}")
+try:
+# I/O-bound operation: Download the image asynchronously
+image_data = await download_image(session, url)
+
+# CPU-bound operation: Process the image (this will block the event loop)  
+    processed_image_data = process_image(image_data)  
+
+    # I/O-bound operation: Save the processed image asynchronously  
+    await save_image(processed_image_data, f"./processed_images_async/processed_image_{idx}.jpg")  
+
+except Exception as e:  
+    print(f"Failed to process {url}: {e}")
+
+async def main():
+if not os.path.exists('processed_images_async'):
+os.mkdir('processed_images_async')
+# Read image URLs from the text file
+image_urls = read_image_urls('url_imagenes.txt')
+
+# Create an aiohttp session for making HTTP requests  
+async with aiohttp.ClientSession() as session:  
+    # Create a list of tasks for asyncio.gather  
+    tasks = [  
+        process_single_image(idx + 1, url, session)  
+        for idx, url in enumerate(image_urls)  
+    ]  
+
+    # Run all tasks concurrently  
+    await asyncio.gather(*tasks)
+
+if name == "main":
+asyncio.run(main())
+
+image_process_multiprocessing_pool.py:
+import os
+import requests
+from PIL import Image, ImageFilter
+import io
+from multiprocessing import Pool
+
+def read_image_urls(file_path):
+with open(file_path, 'r') as f:
+image_urls = [line.strip() for line in f if line.strip()]
+image_urls = image_urls * 4
+return image_urls
+
+def download_image(url):
+response = requests.get(url)
+response.raise_for_status()
+return response.content  # Devuelve los datos de la imagen en bytes
+
+def process_image(image_data):
+# Convertir bytes a objeto PIL Image
+image = Image.open(io.BytesIO(image_data))
+
+# Aplicar un filtro de nitidez intensivo en CPU  
+for _ in range(10):  
+    image = image.filter(ImageFilter.UnsharpMask(radius=2, percent=150, threshold=3))  
+
+# Guardar la imagen procesada en bytes  
+output = io.BytesIO()  
+image.save(output, format='JPEG')  
+return output.getvalue()  # Devuelve los datos de la imagen procesada en bytes
+
+def save_image(image_data, filename):
+with open(filename, 'wb') as f:
+f.write(image_data)
+
+def process_single_image(args):
+idx, url = args
+print(f"Procesando imagen {idx}")
+try:
+image_data = download_image(url)
+processed_image_data = process_image(image_data)
+save_image(processed_image_data, f"./processed_images_multiprocessing_pool/processed_image_{idx}.jpg")
+except Exception as e:
+print(f"Error al procesar {url}: {e}")
+
+def main():
+if not os.path.exists('processed_images_multiprocessing_pool'):
+os.mkdir('processed_images_multiprocessing_pool')
+image_urls = read_image_urls('url_imagenes.txt')
+args = [(idx + 1, url) for idx, url in enumerate(image_urls)]
+num_processes = 4  # Ajustar segÃºn las capacidades del sistema
+
+with Pool(processes=num_processes) as pool:  
+    pool.map(process_single_image, args)
+
+if name == "main":
+main()
+
+image_process_multiprocessing.py:
+import multiprocessing
+import os
+import requests
+from PIL import Image, ImageFilter
+import io
+
+def read_image_urls(file_path):
+with open(file_path, 'r') as f:
+image_urls = [line.strip() for line in f if line.strip()]
+image_urls = image_urls * 4
+return image_urls
+
+def download_image(url):
+response = requests.get(url)
+response.raise_for_status()
+return response.content  # Devuelve los datos de la imagen en bytes
+
+def process_image(image_data):
+# Convertir bytes a objeto PIL Image
+image = Image.open(io.BytesIO(image_data))
+
+# Aplicar un filtro de nitidez intensivo en CPU  
+for _ in range(10):  
+    image = image.filter(ImageFilter.UnsharpMask(radius=2, percent=150, threshold=3))  
+
+# Guardar la imagen procesada en bytes  
+output = io.BytesIO()  
+image.save(output, format='JPEG')  
+return output.getvalue()  # Devuelve los datos de la imagen procesada en bytes
+
+def save_image(image_data, filename):
+with open(filename, 'wb') as f:
+f.write(image_data)
+
+def process_single_image(idx, url):
+print(f"Procesando imagen {idx}")
+try:
+image_data = download_image(url)
+processed_image_data = process_image(image_data)
+save_image(processed_image_data, f"./processed_images_multiprocessing/processed_image_{idx}.jpg")
+except Exception as e:
+print(f"Error al procesar {url}: {e}")
+
+def main():
+if not os.path.exists('processed_images_multiprocessing'):
+os.mkdir('processed_images_multiprocessing')
+image_urls = read_image_urls('url_imagenes.txt')
+processes = []
+
+for idx, url in enumerate(image_urls, start=1):  
+    p = multiprocessing.Process(target=process_single_image, args=(idx, url))  
+    processes.append(p)  
+    p.start()  
+
+for p in processes:  
+    p.join()
+
+if name == "main":
+main()
+
+image_process_multithread.py:
+import os
+import threading
+import requests
+from PIL import Image, ImageFilter
+import io
+
+def read_image_urls(file_path):
+with open(file_path, 'r') as f:
+image_urls = [line.strip() for line in f if line.strip()]
+image_urls = image_urls * 4
+return image_urls
+
+def download_image(url):
+response = requests.get(url)
+response.raise_for_status()
+return response.content  # Devuelve los datos de la imagen en bytes
+
+def process_image(image_data):
+# Convertir bytes a objeto PIL Image
+image = Image.open(io.BytesIO(image_data))
+
+# Aplicar un filtro de nitidez intensivo en CPU  
+for _ in range(10):  
+    image = image.filter(ImageFilter.UnsharpMask(radius=2, percent=150, threshold=3))  
+
+# Guardar la imagen procesada en bytes  
+output = io.BytesIO()  
+image.save(output, format='JPEG')  
+return output.getvalue()  # Devuelve los datos de la imagen procesada en bytes
+
+def save_image(image_data, filename):
+with open(filename, 'wb') as f:
+f.write(image_data)
+
+def process_single_image(idx, url):
+print(f"Procesando imagen {idx}")
+try:
+image_data = download_image(url)
+processed_image_data = process_image(image_data)
+save_image(processed_image_data, f"./processed_images_multithread/processed_image_{idx}.jpg")
+except Exception as e:
+print(f"Error al procesar {url}: {e}")
+
+def main():
+if not os.path.exists('processed_images_multithread'):
+os.mkdir('processed_images_multithread')
+image_urls = read_image_urls('url_imagenes.txt')
+threads = []
+
+for idx, url in enumerate(image_urls, start=1):  
+    thread = threading.Thread(target=process_single_image, args=(idx, url))  
+    threads.append(thread)  
+    thread.start()  
+
+for thread in threads:  
+    thread.join()
+
+if name == "main":
+main()
+
+image_process_multithreaded_pool.py:
+import os
+import requests
+from PIL import Image, ImageFilter
+import io
+from concurrent.futures import ThreadPoolExecutor, as_completed
+
+def read_image_urls(file_path):
+with open(file_path, 'r') as f:
+image_urls = [line.strip() for line in f if line.strip()]
+image_urls = image_urls * 4
+return image_urls
+
+def download_image(url):
+response = requests.get(url)
+response.raise_for_status()
+return response.content  # Devuelve los datos de la imagen en bytes
+
+def process_image(image_data):
+# Convertir bytes a objeto PIL Image
+image = Image.open(io.BytesIO(image_data))
+
+# Aplicar un filtro de nitidez intensivo en CPU  
+for _ in range(10):  
+    image = image.filter(ImageFilter.UnsharpMask(radius=2, percent=150, threshold=3))  
+
+# Guardar la imagen procesada en bytes  
+output = io.BytesIO()  
+image.save(output, format='JPEG')  
+return output.getvalue()  # Devuelve los datos de la imagen procesada en bytes
+
+def save_image(image_data, filename):
+with open(filename, 'wb') as f:
+f.write(image_data)
+
+def process_single_image(idx, url):
+print(f"Procesando imagen {idx}")
+try:
+image_data = download_image(url)
+processed_image_data = process_image(image_data)
+save_image(processed_image_data, f"./processed_images_multithread_pool/processed_image_{idx}.jpg")
+except Exception as e:
+print(f"Error al procesar {url}: {e}")
+
+def main():
+if not os.path.exists('processed_images_multithread_pool'):
+os.mkdir('processed_images_multithread_pool')
+image_urls = read_image_urls('url_imagenes.txt')
+max_workers = 10  # Ajustar segÃºn las capacidades del sistema
+
+with ThreadPoolExecutor(max_workers=max_workers) as executor:  
+    futures = {  
+        executor.submit(process_single_image, idx + 1, url): idx  
+        for idx, url in enumerate(image_urls)  
+    }  
+
+    for future in as_completed(futures):  
+        idx = futures[future]  
+        try:  
+            future.result()  
+        except Exception as e:  
+            print(f"Imagen {idx + 1} generÃ³ una excepciÃ³n: {e}")
+
+if name == "main":
+main()
+
+image_process_sync.py:
+import os
+import requests
+from PIL import Image, ImageFilter
+import io
+
+def read_image_urls(file_path):
+with open(file_path, 'r') as f:
+image_urls = [line.strip() for line in f if line.strip()]
+
+image_urls = image_urls * 4  
+return image_urls
+
+def download_image(url):
+response = requests.get(url)
+response.raise_for_status()  # Ensure we notice bad responses
+return Image.open(io.BytesIO(response.content))
+
+def process_image(image):
+# Apply a computationally intensive filter
+for _ in range(10):  # Increase the range for more CPU load
+image = image.filter(ImageFilter.FIND_EDGES)
+return image
+
+def save_image(image, filename):
+image.save(filename)
+
+def main():
+# I/O-bound operation: Read image URLs from a text file
+image_urls = read_image_urls('url_imagenes.txt')
+
+for idx, url in enumerate(image_urls):  
+    print(f"Processing image {idx+1}/{len(image_urls)}")  
+
+    try:  
+        # I/O-bound operation: Download the image  
+        image = download_image(url)  
+
+        # CPU-bound operation: Process the image  
+        processed_image = process_image(image)  
+          
+        # check if the directory exists  
+        if not os.path.exists('processed_images_sync'):  
+            os.makedirs('processed_images_sync')  
+          
+        # I/O-bound operation: Save the processed image  
+        save_image(processed_image, f"./processed_images_sync/processed_image_{idx+1}.jpg")  
+
+    except Exception as e:  
+        print(f"Failed to process {url}: {e}")
+
+if name == "main":
+main()
+
+requirements.txt:
+aiofiles==24.1.0
+aiohappyeyeballs==2.4.4
+aiohttp==3.11.8
+aiosignal==1.3.1
+attrs==24.2.0
+beautifulsoup4==4.12.3
+bs4==0.0.2
+certifi==2024.8.30
+charset-normalizer==3.4.0
+frozenlist==1.5.0
+idna==3.10
+multidict==6.1.0
+pillow==11.0.0
+propcache==0.2.1
+requests==2.32.3
+soupsieve==2.6
+urllib3==2.2.3
+yarl==1.18.0
+
+url_imagenes.txt:
+https://images.pexels.com/photos/1484657/pexels-photo-1484657.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1
+https://c.pxhere.com/photos/21/8f/bloom_blossom_flora_flowers_HD_wallpaper_plants_tulips-944718.jpg!d
+https://images.pexels.com/photos/80453/poppy-field-of-poppies-flower-flowers-80453.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1
+https://live.staticflickr.com/7/10222168_befb5f79fa_o.jpg
+https://i2.pickpik.com/photos/465/832/946/flowers-snow-gerber-daisy-preview.jpg
+https://c.pxhere.com/images/dc/69/c319510b209cc742f8857843d304-1634601.jpg!d
+https://storage.googleapis.com/pod_public/1300/204235.jpg
+https://upload.wikimedia.org/wikipedia/commons/2/2d/Beautiful-jungle-flowers.jpg
+https://live.staticflickr.com/3658/3317609868_ca38ef37d5_b.jpg
+https://i0.pickpik.com/photos/850/150/563/flowers-nature-plants-autumn-preview.jpg
+https://images.pexels.com/photos/68507/spring-flowers-flowers-collage-floral-68507.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1
+https://wallpaperdelight.com/wp-content/uploads/2024/06/Minimalist-wallpaper-featuring-a-lone-delicate-flower-in-soft-pastel-tones-against-a-pure-white-backdrop-exuding-a-serene-and-sophisticated-ambiance.jpg
+https://images.pexels.com/photos/56866/garden-rose-red-pink-56866.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1
+https://images.pexels.com/photos/355748/pexels-photo-355748.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1
+https://c.pxhere.com/photos/75/0b/bloom_close_up_colorful_colourful_daisies_flora_flowers_nature-987773.jpg!d
+https://images.pexels.com/photos/736230/pexels-photo-736230.jpeg
+
